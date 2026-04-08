@@ -263,7 +263,7 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 		resp.Diagnostics.AddError("Unable to create public registry module", err.Error())
 		return
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	respBody, _ := io.ReadAll(httpResp.Body)
 
@@ -376,7 +376,7 @@ func (r *publicRegistryModuleResource) Delete(ctx context.Context, req resource.
 		resp.Diagnostics.AddError("Unable to delete public registry module", err.Error())
 		return
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	if httpResp.StatusCode != 200 && httpResp.StatusCode != 204 && httpResp.StatusCode != 404 {
 		respBody, _ := io.ReadAll(httpResp.Body)
@@ -479,7 +479,7 @@ func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, name
 		if err != nil {
 			return nil, fmt.Errorf("fetching modules from public registry: %w", err)
 		}
-		defer httpResp.Body.Close()
+		defer func() { _ = httpResp.Body.Close() }()
 
 		if httpResp.StatusCode != 200 {
 			return nil, fmt.Errorf("public registry returned status %d", httpResp.StatusCode)
