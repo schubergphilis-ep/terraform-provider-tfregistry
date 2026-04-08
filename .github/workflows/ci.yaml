@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  Commit:
+    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/commit.yaml@v1.0.1
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets: inherit
+
+  Terraform:
+    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/ci.yaml@v1.0.1
+    permissions:
+      contents: write
+      security-events: write
+    secrets: inherit
