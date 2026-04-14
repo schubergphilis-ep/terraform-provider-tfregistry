@@ -1,22 +1,24 @@
-default: build
+default: fmt lint install generate
 
 build:
-	go build -o terraform-provider-tfregistry
+	go build -v ./...
 
 install: build
-	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/schubergphilis-ep/tfregistry/0.0.1/$$(go env GOOS)_$$(go env GOARCH)
-	cp terraform-provider-tfregistry ~/.terraform.d/plugins/registry.terraform.io/schubergphilis-ep/tfregistry/0.0.1/$$(go env GOOS)_$$(go env GOARCH)/
+	go install -v ./...
 
-test:
-	go test ./... -timeout 30s -parallel 4
+lint:
+	golangci-lint run
 
-testacc:
-	TF_ACC=1 go test ./... -v -timeout 15m
+generate:
+	cd tools; go generate ./...
 
 fmt:
-	go fmt ./...
+	gofmt -s -w -e .
 
-vet:
-	go vet ./...
+test:
+	go test -v -cover -timeout=120s -parallel=10 ./...
 
-.PHONY: default build install test testacc fmt vet
+testacc:
+	TF_ACC=1 go test -v -cover -timeout 120m ./...
+
+.PHONY: fmt lint test testacc build install generate
