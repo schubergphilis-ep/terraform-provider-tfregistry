@@ -1,3 +1,5 @@
+# WARNING: This file is managed automatically and may be overwritten at any time.
+
 name: CI
 
 on:
@@ -6,15 +8,14 @@ on:
 
 jobs:
   Commit:
-    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/commit.yaml@v1.0.1
+    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/commit.yaml@v2.0.0
     permissions:
       contents: read
       pull-requests: write
     secrets: inherit
 
-  Terraform:
-    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/ci.yaml@v1.0.1
+  Provider:
+    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/provider-ci.yaml@v2.0.0
     permissions:
-      contents: write
-      security-events: write
+      contents: read
     secrets: inherit
