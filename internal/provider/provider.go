@@ -132,7 +132,15 @@ func (p *tfregistryProvider) Configure(ctx context.Context, req provider.Configu
 	}
 
 	// Build HTTP client
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	defaultTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected HTTP transport type",
+			fmt.Sprintf("Expected *http.Transport, got %T", http.DefaultTransport),
+		)
+		return
+	}
+	transport := defaultTransport.Clone()
 	if transport.TLSClientConfig == nil {
 		transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}
