@@ -1,3 +1,5 @@
+<!-- WARNING: This file is managed automatically and may be overwritten at any time. -->
+
 # Contributing
 
 Thank you for considering contributing! This document outlines the standards and processes we follow to ensure consistent, high-quality contributions.
