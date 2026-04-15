@@ -164,6 +164,7 @@ func (p *tfregistryProvider) Configure(ctx context.Context, req provider.Configu
 func (p *tfregistryProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewPublicRegistryModuleResource,
+		NewPublicRegistryProviderResource,
 	}
 }
 

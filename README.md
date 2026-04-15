@@ -1,10 +1,10 @@
 # terraform-provider-tfregistry
 
-A Terraform provider for publishing modules to the [public Terraform Registry](https://registry.terraform.io/) from VCS repositories via HCP Terraform.
+A Terraform provider for publishing modules and providers to the [public Terraform Registry](https://registry.terraform.io/) from VCS repositories via HCP Terraform.
 
 ## Why this provider?
 
-The official [tfe provider](https://registry.terraform.io/providers/hashicorp/tfe/latest) supports managing private registry modules, but does **not** support publishing modules to the **public** Terraform Registry. This provider fills that gap, allowing you to automate public module publishing from your VCS repositories using Terraform.
+The official [tfe provider](https://registry.terraform.io/providers/hashicorp/tfe/latest) supports managing private registry modules, but does **not** support publishing modules or providers to the **public** Terraform Registry. This provider fills that gap, allowing you to automate public module and provider publishing from your VCS repositories using Terraform.
 
 ## Usage
 
@@ -16,6 +16,15 @@ provider "tfregistry" {
 resource "tfregistry_module" "example" {
   vcs_repo {
     identifier                 = "my-github-org/terraform-aws-my-module"
+    github_app_installation_id = "ghain-xxxxxxxxxxxx"
+  }
+}
+
+resource "tfregistry_provider" "example" {
+  category = "cloud-automation"
+
+  vcs_repo {
+    identifier                 = "my-github-org/terraform-provider-myprovider"
     github_app_installation_id = "ghain-xxxxxxxxxxxx"
   }
 }
