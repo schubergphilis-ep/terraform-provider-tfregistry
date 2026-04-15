@@ -280,10 +280,15 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 
 	// Wait for the module to appear on the public registry
 	tflog.Debug(ctx, "Waiting for module to appear on the public registry")
+	registryToken, err := fetchRegistryAccessToken(ctx, r.config.HTTPClient, r.config.Token, r.config.BaseURL, organization)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to fetch registry access token", err.Error())
+		return
+	}
 	deadline := time.Now().Add(5 * time.Minute)
 	var found bool
 	for time.Now().Before(deadline) {
-		entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient, namespace, moduleName, moduleProvider)
+		entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient, registryToken, namespace, moduleName, moduleProvider)
 		if err == nil && entry != nil {
 			namespace = entry.Namespace
 			found = true
@@ -317,7 +322,12 @@ func (r *publicRegistryModuleResource) Read(ctx context.Context, req resource.Re
 
 	tflog.Debug(ctx, "Reading public registry module from registry.terraform.io")
 
-	entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient,
+	registryToken, err := fetchRegistryAccessToken(ctx, r.config.HTTPClient, r.config.Token, r.config.BaseURL, state.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to fetch registry access token", err.Error())
+		return
+	}
+	entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient, registryToken,
 		state.Namespace.ValueString(), state.Name.ValueString(), state.ModuleProvider.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read public registry module", err.Error())
@@ -403,7 +413,12 @@ func (r *publicRegistryModuleResource) ImportState(ctx context.Context, req reso
 	name := s[2]
 	moduleProvider := s[3]
 
-	entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient, namespace, name, moduleProvider)
+	registryToken, err := fetchRegistryAccessToken(ctx, r.config.HTTPClient, r.config.Token, r.config.BaseURL, organization)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to fetch registry access token", err.Error())
+		return
+	}
+	entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient, registryToken, namespace, name, moduleProvider)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read public registry module during import", err.Error())
 		return
@@ -461,7 +476,7 @@ func parseModuleRepoName(repoName string) (name string, provider string, err err
 
 // readPublicRegistryModule looks up a module on registry.terraform.io.
 // Returns nil, nil if the module is not found.
-func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, namespace, name, provider string) (*registryModuleEntry, error) {
+func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, token, namespace, name, provider string) (*registryModuleEntry, error) {
 	pageNum := 1
 	for {
 		listURL := fmt.Sprintf(
@@ -474,6 +489,7 @@ func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, name
 			return nil, fmt.Errorf("creating request: %w", err)
 		}
 		httpReq.Header.Set("Accept", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+token)
 
 		httpResp, err := httpClient.Do(httpReq)
 		if err != nil {

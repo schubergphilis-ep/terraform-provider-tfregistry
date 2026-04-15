@@ -70,7 +70,7 @@ func TestReadPublicRegistryProvider_Found(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	entry, err := readPublicRegistryProvider(context.Background(), client, "test-ns", "aws")
+	entry, err := readPublicRegistryProvider(context.Background(), client, "", "test-ns", "aws")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,12 +103,33 @@ func TestReadPublicRegistryProvider_NotFound(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	entry, err := readPublicRegistryProvider(context.Background(), client, "test-ns", "nonexistent")
+	entry, err := readPublicRegistryProvider(context.Background(), client, "", "test-ns", "nonexistent")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if entry != nil {
 		t.Errorf("expected nil entry, got %+v", entry)
+	}
+}
+
+func TestReadPublicRegistryProvider_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `not json at all`)
+	}))
+	defer server.Close()
+
+	client := server.Client()
+	originalTransport := client.Transport
+	client.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		req.URL.Scheme = "http"
+		req.URL.Host = server.Listener.Addr().String()
+		return originalTransport.RoundTrip(req)
+	})
+
+	_, err := readPublicRegistryProvider(context.Background(), client, "", "test-ns", "aws")
+	if err == nil {
+		t.Fatal("expected error for invalid JSON response, got nil")
 	}
 }
 
@@ -126,7 +147,7 @@ func TestReadPublicRegistryProvider_ServerError(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	_, err := readPublicRegistryProvider(context.Background(), client, "test-ns", "aws")
+	_, err := readPublicRegistryProvider(context.Background(), client, "", "test-ns", "aws")
 	if err == nil {
 		t.Fatal("expected error for 500 response, got nil")
 	}
@@ -164,7 +185,7 @@ func TestReadPublicRegistryProvider_Pagination(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	entry, err := readPublicRegistryProvider(context.Background(), client, "test-ns", "target")
+	entry, err := readPublicRegistryProvider(context.Background(), client, "", "test-ns", "target")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
