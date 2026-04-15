@@ -1,0 +1,18 @@
+version: "2"
+
+linters:
+  enable:
+    - copyloopvar
+    - durationcheck
+    - errcheck
+    - forcetypeassert
+    - godot
+    - ineffassign
+    - misspell
+    - nilerr
+    - predeclared
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - usetesting
