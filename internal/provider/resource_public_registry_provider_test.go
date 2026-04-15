@@ -38,7 +38,8 @@ func TestParseProviderRepoName(t *testing.T) {
 }
 
 // makeProviderEntry builds a registryProviderEntry matching the actual registry.terraform.io response shape.
-func makeProviderEntry(namespace, name, categorySlug string) registryProviderEntry {
+func makeProviderEntry(name, categorySlug string) registryProviderEntry {
+	const namespace = "test-ns"
 	e := registryProviderEntry{
 		Address:   fmt.Sprintf("%s/%s", namespace, name),
 		Name:      name,
@@ -50,8 +51,8 @@ func makeProviderEntry(namespace, name, categorySlug string) registryProviderEnt
 
 func TestReadPublicRegistryProvider_Found(t *testing.T) {
 	entries := []registryProviderEntry{
-		makeProviderEntry("test-ns", "aws", "cloud-automation"),
-		makeProviderEntry("test-ns", "google", "infrastructure"),
+		makeProviderEntry("aws", "cloud-automation"),
+		makeProviderEntry("google", "infrastructure"),
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +85,7 @@ func TestReadPublicRegistryProvider_Found(t *testing.T) {
 
 func TestReadPublicRegistryProvider_NotFound(t *testing.T) {
 	entries := []registryProviderEntry{
-		makeProviderEntry("test-ns", "aws", "cloud-automation"),
+		makeProviderEntry("aws", "cloud-automation"),
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -156,10 +157,10 @@ func TestReadPublicRegistryProvider_ServerError(t *testing.T) {
 func TestReadPublicRegistryProvider_Pagination(t *testing.T) {
 	page1 := make([]registryProviderEntry, 50)
 	for i := range page1 {
-		page1[i] = makeProviderEntry("test-ns", fmt.Sprintf("provider-%d", i), "utility")
+		page1[i] = makeProviderEntry(fmt.Sprintf("provider-%d", i), "utility")
 	}
 	page2 := []registryProviderEntry{
-		makeProviderEntry("test-ns", "target", "networking"),
+		makeProviderEntry("target", "networking"),
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
