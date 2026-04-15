@@ -479,13 +479,14 @@ func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, name
 		if err != nil {
 			return nil, fmt.Errorf("fetching modules from public registry: %w", err)
 		}
-		defer func() { _ = httpResp.Body.Close() }()
 
 		if httpResp.StatusCode != 200 {
+			_ = httpResp.Body.Close()
 			return nil, fmt.Errorf("public registry returned status %d", httpResp.StatusCode)
 		}
 
 		respBody, err := io.ReadAll(httpResp.Body)
+		_ = httpResp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading registry response: %w", err)
 		}
