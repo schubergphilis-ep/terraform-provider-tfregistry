@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/compare/v1.0.0...v1.1.0) (2026-04-16)
+
+
+### 🚀 Features
+
+* implement tfregistry_provider ([#4](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/issues/4)) ([ace2fde](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/commit/ace2fde241e2decf7300c7869dd4198608302b2a))
+
 ## 1.0.0 (2026-04-15)
 
 
