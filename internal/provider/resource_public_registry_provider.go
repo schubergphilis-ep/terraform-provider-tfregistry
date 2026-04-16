@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,30 +22,30 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-var _ resource.Resource = &publicRegistryModuleResource{}
-var _ resource.ResourceWithConfigure = &publicRegistryModuleResource{}
-var _ resource.ResourceWithImportState = &publicRegistryModuleResource{}
+var _ resource.Resource = &publicRegistryProviderResource{}
+var _ resource.ResourceWithConfigure = &publicRegistryProviderResource{}
+var _ resource.ResourceWithImportState = &publicRegistryProviderResource{}
 
-func NewPublicRegistryModuleResource() resource.Resource {
-	return &publicRegistryModuleResource{}
+func NewPublicRegistryProviderResource() resource.Resource {
+	return &publicRegistryProviderResource{}
 }
 
-type publicRegistryModuleResource struct {
+type publicRegistryProviderResource struct {
 	config *ProviderConfig
 }
 
 // --- Terraform state / plan models ---
 
-type publicRegistryModuleModel struct {
-	ID             types.String                      `tfsdk:"id"`
-	Organization   types.String                      `tfsdk:"organization"`
-	Name           types.String                      `tfsdk:"name"`
-	Namespace      types.String                      `tfsdk:"namespace"`
-	ModuleProvider types.String                      `tfsdk:"module_provider"`
-	VCSRepo        *publicRegistryModuleVCSRepoModel `tfsdk:"vcs_repo"`
+type publicRegistryProviderModel struct {
+	ID           types.String                        `tfsdk:"id"`
+	Organization types.String                        `tfsdk:"organization"`
+	Name         types.String                        `tfsdk:"name"`
+	Namespace    types.String                        `tfsdk:"namespace"`
+	Category     types.String                        `tfsdk:"category"`
+	VCSRepo      *publicRegistryProviderVCSRepoModel `tfsdk:"vcs_repo"`
 }
 
-type publicRegistryModuleVCSRepoModel struct {
+type publicRegistryProviderVCSRepoModel struct {
 	Identifier        types.String `tfsdk:"identifier"`
 	GHAInstallationID types.String `tfsdk:"github_app_installation_id"`
 	OAuthTokenID      types.String `tfsdk:"oauth_token_id"`
@@ -54,48 +53,53 @@ type publicRegistryModuleVCSRepoModel struct {
 
 // --- API request / response types ---
 
-type createModuleRequest struct {
-	Data createModuleData `json:"data"`
+type createProviderRequest struct {
+	Data createProviderData `json:"data"`
 }
 
-type createModuleData struct {
-	Attributes       createModuleAttrs `json:"attributes"`
-	OrganizationName string            `json:"organization_name"`
+type createProviderData struct {
+	Type       string              `json:"type"`
+	Attributes createProviderAttrs `json:"attributes"`
 }
 
-type createModuleAttrs struct {
-	VCSRepo createModuleVCSRepo `json:"vcs_repo"`
+type createProviderAttrs struct {
+	Name         string                `json:"name"`
+	Namespace    string                `json:"namespace"`
+	RegistryName string                `json:"registry-name"`
+	Category     string                `json:"category"`
+	VCSRepo      createProviderVCSRepo `json:"vcs_repo"`
 }
 
-type createModuleVCSRepo struct {
+type createProviderVCSRepo struct {
 	Identifier        string `json:"identifier"`
 	GHAInstallationID string `json:"github_app_installation_id,omitempty"`
 	OAuthTokenID      string `json:"oauth_token_id,omitempty"`
 }
 
-type registryModuleEntry struct {
+type registryProviderEntry struct {
 	Address   string `json:"address"`
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
-	System    string `json:"system"`
-	SourceURL string `json:"source-url"`
+	Category  struct {
+		Slug string `json:"slug"`
+	} `json:"category"`
 }
 
 // --- Resource interface ---
 
-func (r *publicRegistryModuleResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_module"
+func (r *publicRegistryProviderResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_provider"
 }
 
-func (r *publicRegistryModuleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *publicRegistryProviderResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Publishes a Terraform module to the public registry from a VCS repository via HCP Terraform. " +
-			"The module name and provider are inferred from the repository name, which must follow " +
-			"the terraform-<PROVIDER>-<NAME> naming convention.",
+		Description: "Publishes a Terraform provider to the public registry from a VCS repository via HCP Terraform. " +
+			"The provider name is inferred from the repository name, which must follow " +
+			"the terraform-provider-<NAME> naming convention.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the public registry module (format: namespace/name/provider).",
+				Description: "The ID of the public registry provider (format: namespace/name).",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -113,30 +117,49 @@ func (r *publicRegistryModuleResource) Schema(_ context.Context, _ resource.Sche
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the module. Computed from the VCS repository name (terraform-<PROVIDER>-<NAME> convention).",
+				Description: "The name of the provider. Computed from the VCS repository name (terraform-provider-<NAME> convention).",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"namespace": schema.StringAttribute{
-				Description: "The namespace of the module on the public registry.",
+				Description: "The namespace of the provider on the public registry.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"module_provider": schema.StringAttribute{
-				Description: "The provider of the module. Computed from the VCS repository name (terraform-<PROVIDER>-<NAME> convention).",
-				Computed:    true,
+			"category": schema.StringAttribute{
+				Description: "The category for the provider. Changing this forces a new resource to be created.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"asset",
+						"ci-cd",
+						"cloud-automation",
+						"communication-messaging",
+						"container-orchestration",
+						"database",
+						"data-management",
+						"infrastructure",
+						"logging-monitoring",
+						"networking",
+						"platform",
+						"security-authentication",
+						"utility",
+						"vcs",
+						"web",
+					),
+				},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 		},
 		Blocks: map[string]schema.Block{
 			"vcs_repo": schema.SingleNestedBlock{
-				Description: "Settings for the registry module's VCS repository.",
+				Description: "Settings for the registry provider's VCS repository.",
 				Attributes: map[string]schema.Attribute{
 					"identifier": schema.StringAttribute{
 						Description: "A reference to your VCS repository in the format <organization>/<repository>.",
@@ -170,7 +193,7 @@ func (r *publicRegistryModuleResource) Schema(_ context.Context, _ resource.Sche
 	}
 }
 
-func (r *publicRegistryModuleResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *publicRegistryProviderResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -185,8 +208,8 @@ func (r *publicRegistryModuleResource) Configure(_ context.Context, req resource
 	r.config = config
 }
 
-func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan publicRegistryModuleModel
+func (r *publicRegistryProviderResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan publicRegistryProviderModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -209,23 +232,27 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	// Derive name and provider from the repo identifier
+	// Derive provider name from the repo identifier
 	repoName := repoNameFromIdentifier(plan.VCSRepo.Identifier.ValueString())
-	moduleName, moduleProvider, err := parseModuleRepoName(repoName)
+	providerName, err := parseProviderRepoName(repoName)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid repository name",
-			fmt.Sprintf("Repository name %q does not follow the terraform-<PROVIDER>-<NAME> naming convention: %s", repoName, err),
+			fmt.Sprintf("Repository name %q does not follow the terraform-provider-<NAME> naming convention: %s", repoName, err),
 		)
 		return
 	}
 
 	// Build create payload
-	createReq := createModuleRequest{
-		Data: createModuleData{
-			OrganizationName: organization,
-			Attributes: createModuleAttrs{
-				VCSRepo: createModuleVCSRepo{
+	createReq := createProviderRequest{
+		Data: createProviderData{
+			Type: "registry-providers",
+			Attributes: createProviderAttrs{
+				Name:         providerName,
+				Namespace:    organization,
+				RegistryName: "public",
+				Category:     plan.Category.ValueString(),
+				VCSRepo: createProviderVCSRepo{
 					Identifier: plan.VCSRepo.Identifier.ValueString(),
 				},
 			},
@@ -238,10 +265,10 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 		createReq.Data.Attributes.VCSRepo.OAuthTokenID = plan.VCSRepo.OAuthTokenID.ValueString()
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("Creating public registry module from repository %s", plan.VCSRepo.Identifier.ValueString()))
+	tflog.Debug(ctx, fmt.Sprintf("Creating public registry provider from repository %s", plan.VCSRepo.Identifier.ValueString()))
 
-	// POST /api/v2/organizations/{org}/registry/modules
-	createURL := fmt.Sprintf("%s://%s/api/v2/organizations/%s/registry/modules",
+	// POST /api/v2/organizations/{org}/registry/providers
+	createURL := fmt.Sprintf("%s://%s/api/v2/organizations/%s/registry/providers",
 		r.config.BaseURL.Scheme, r.config.BaseURL.Host, url.PathEscape(organization))
 
 	body, err := json.Marshal(createReq)
@@ -256,11 +283,11 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 		return
 	}
 	r.setAuthHeaders(httpReq)
-	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Content-Type", "application/vnd.api+json")
 
 	httpResp, err := r.config.HTTPClient.Do(httpReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to create public registry module", err.Error())
+		resp.Diagnostics.AddError("Unable to create public registry provider", err.Error())
 		return
 	}
 	defer func() { _ = httpResp.Body.Close() }()
@@ -269,7 +296,7 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
 		resp.Diagnostics.AddError(
-			"Unable to create public registry module",
+			"Unable to create public registry provider",
 			fmt.Sprintf("API returned status %d: %s", httpResp.StatusCode, string(respBody)),
 		)
 		return
@@ -278,8 +305,8 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 	// Try to extract namespace from response, fall back to organization name
 	namespace := extractNamespaceFromResponse(respBody, organization)
 
-	// Wait for the module to appear on the public registry
-	tflog.Debug(ctx, "Waiting for module to appear on the public registry")
+	// Wait for the provider to appear on the public registry
+	tflog.Debug(ctx, "Waiting for provider to appear on the public registry")
 	registryToken, err := fetchRegistryAccessToken(ctx, r.config.HTTPClient, r.config.Token, r.config.BaseURL, organization)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to fetch registry access token", err.Error())
@@ -288,7 +315,7 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 	deadline := time.Now().Add(5 * time.Minute)
 	var found bool
 	for time.Now().Before(deadline) {
-		entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient, registryToken, namespace, moduleName, moduleProvider)
+		entry, err := readPublicRegistryProvider(ctx, r.config.HTTPClient, registryToken, namespace, providerName)
 		if err == nil && entry != nil {
 			namespace = entry.Namespace
 			found = true
@@ -297,63 +324,65 @@ func (r *publicRegistryModuleResource) Create(ctx context.Context, req resource.
 		time.Sleep(5 * time.Second)
 	}
 	if !found {
-		tflog.Warn(ctx, "Module not yet visible on public registry after creation; proceeding with derived values")
+		tflog.Warn(ctx, "Provider not yet visible on public registry after creation; proceeding with derived values")
 	}
 
-	syntheticID := fmt.Sprintf("%s/%s/%s", namespace, moduleName, moduleProvider)
+	syntheticID := fmt.Sprintf("%s/%s", namespace, providerName)
 
-	result := publicRegistryModuleModel{
-		ID:             types.StringValue(syntheticID),
-		Organization:   types.StringValue(organization),
-		Name:           types.StringValue(moduleName),
-		Namespace:      types.StringValue(namespace),
-		ModuleProvider: types.StringValue(moduleProvider),
-		VCSRepo:        plan.VCSRepo,
+	result := publicRegistryProviderModel{
+		ID:           types.StringValue(syntheticID),
+		Organization: types.StringValue(organization),
+		Name:         types.StringValue(providerName),
+		Namespace:    types.StringValue(namespace),
+		Category:     plan.Category,
+		VCSRepo:      plan.VCSRepo,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &result)...)
 }
 
-func (r *publicRegistryModuleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state publicRegistryModuleModel
+func (r *publicRegistryProviderResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state publicRegistryProviderModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "Reading public registry module from registry.terraform.io")
+	tflog.Debug(ctx, "Reading public registry provider from registry.terraform.io")
 
 	registryToken, err := fetchRegistryAccessToken(ctx, r.config.HTTPClient, r.config.Token, r.config.BaseURL, state.Organization.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to fetch registry access token", err.Error())
 		return
 	}
-	entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient, registryToken,
-		state.Namespace.ValueString(), state.Name.ValueString(), state.ModuleProvider.ValueString())
+	entry, err := readPublicRegistryProvider(ctx, r.config.HTTPClient, registryToken,
+		state.Namespace.ValueString(), state.Name.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to read public registry module", err.Error())
+		resp.Diagnostics.AddError("Unable to read public registry provider", err.Error())
 		return
 	}
 	if entry == nil {
-		tflog.Debug(ctx, "Public registry module no longer exists")
+		tflog.Debug(ctx, "Public registry provider no longer exists")
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	// Update computed fields, preserve VCS repo from state
+	// Update computed fields and category from registry; preserve VCS repo from state
 	state.Name = types.StringValue(entry.Name)
 	state.Namespace = types.StringValue(entry.Namespace)
-	state.ModuleProvider = types.StringValue(entry.System)
-	state.ID = types.StringValue(fmt.Sprintf("%s/%s/%s", entry.Namespace, entry.Name, entry.System))
+	state.ID = types.StringValue(fmt.Sprintf("%s/%s", entry.Namespace, entry.Name))
+	if entry.Category.Slug != "" {
+		state.Category = types.StringValue(entry.Category.Slug)
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *publicRegistryModuleResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *publicRegistryProviderResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
 	resp.Diagnostics.AddError("Update not supported", "All attributes require replacement. This is a bug in the provider.")
 }
 
-func (r *publicRegistryModuleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state publicRegistryModuleModel
+func (r *publicRegistryProviderResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state publicRegistryProviderModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -362,17 +391,15 @@ func (r *publicRegistryModuleResource) Delete(ctx context.Context, req resource.
 	organization := state.Organization.ValueString()
 	namespace := state.Namespace.ValueString()
 	name := state.Name.ValueString()
-	moduleProvider := state.ModuleProvider.ValueString()
 
-	tflog.Debug(ctx, fmt.Sprintf("Deleting public registry module %s/%s/%s", namespace, name, moduleProvider))
+	tflog.Debug(ctx, fmt.Sprintf("Deleting public registry provider %s/%s", namespace, name))
 
-	// DELETE /api/v2/organizations/{org}/registry/modules/{namespace}/{name}/{provider}
-	deleteURL := fmt.Sprintf("%s://%s/api/v2/organizations/%s/registry/modules/%s/%s/%s",
+	// DELETE /api/v2/organizations/{org}/registry/providers/{namespace}/{name}
+	deleteURL := fmt.Sprintf("%s://%s/api/v2/organizations/%s/registry/providers/%s/%s",
 		r.config.BaseURL.Scheme, r.config.BaseURL.Host,
 		url.PathEscape(organization),
 		url.PathEscape(namespace),
-		url.PathEscape(name),
-		url.PathEscape(moduleProvider))
+		url.PathEscape(name))
 
 	httpReq, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, nil)
 	if err != nil {
@@ -383,7 +410,7 @@ func (r *publicRegistryModuleResource) Delete(ctx context.Context, req resource.
 
 	httpResp, err := r.config.HTTPClient.Do(httpReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to delete public registry module", err.Error())
+		resp.Diagnostics.AddError("Unable to delete public registry provider", err.Error())
 		return
 	}
 	defer func() { _ = httpResp.Body.Close() }()
@@ -391,19 +418,19 @@ func (r *publicRegistryModuleResource) Delete(ctx context.Context, req resource.
 	if httpResp.StatusCode != 200 && httpResp.StatusCode != 204 && httpResp.StatusCode != 404 {
 		respBody, _ := io.ReadAll(httpResp.Body)
 		resp.Diagnostics.AddError(
-			"Unable to delete public registry module",
+			"Unable to delete public registry provider",
 			fmt.Sprintf("API returned status %d: %s", httpResp.StatusCode, string(respBody)),
 		)
 	}
 }
 
-func (r *publicRegistryModuleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Format: <ORGANIZATION>/<NAMESPACE>/<NAME>/<PROVIDER>
-	s := strings.SplitN(req.ID, "/", 4)
-	if len(s) != 4 {
+func (r *publicRegistryProviderResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	// Format: <ORGANIZATION>/<NAMESPACE>/<NAME>
+	s := strings.SplitN(req.ID, "/", 3)
+	if len(s) != 3 {
 		resp.Diagnostics.AddError(
-			"Error importing public registry module",
-			fmt.Sprintf("Invalid import format: %s (expected <ORGANIZATION>/<NAMESPACE>/<NAME>/<PROVIDER>)", req.ID),
+			"Error importing public registry provider",
+			fmt.Sprintf("Invalid import format: %s (expected <ORGANIZATION>/<NAMESPACE>/<NAME>)", req.ID),
 		)
 		return
 	}
@@ -411,76 +438,72 @@ func (r *publicRegistryModuleResource) ImportState(ctx context.Context, req reso
 	organization := s[0]
 	namespace := s[1]
 	name := s[2]
-	moduleProvider := s[3]
 
 	registryToken, err := fetchRegistryAccessToken(ctx, r.config.HTTPClient, r.config.Token, r.config.BaseURL, organization)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to fetch registry access token", err.Error())
 		return
 	}
-	entry, err := readPublicRegistryModule(ctx, r.config.HTTPClient, registryToken, namespace, name, moduleProvider)
+	entry, err := readPublicRegistryProvider(ctx, r.config.HTTPClient, registryToken, namespace, name)
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to read public registry module during import", err.Error())
+		resp.Diagnostics.AddError("Unable to read public registry provider during import", err.Error())
 		return
 	}
 	if entry == nil {
 		resp.Diagnostics.AddError(
-			"Module not found",
-			fmt.Sprintf("Module %s/%s/%s was not found on the public registry", namespace, name, moduleProvider),
+			"Provider not found",
+			fmt.Sprintf("Provider %s/%s was not found on the public registry", namespace, name),
 		)
 		return
 	}
 
-	syntheticID := fmt.Sprintf("%s/%s/%s", namespace, name, moduleProvider)
+	syntheticID := fmt.Sprintf("%s/%s", namespace, name)
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), syntheticID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("organization"), organization)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("namespace"), namespace)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("module_provider"), moduleProvider)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("namespace"), entry.Namespace)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), entry.Name)...)
+	if entry.Category.Slug != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("category"), entry.Category.Slug)...)
+	}
 }
 
 // --- Helper methods ---
 
-func (r *publicRegistryModuleResource) resolveOrganization(resourceOrg types.String) string {
+func (r *publicRegistryProviderResource) resolveOrganization(resourceOrg types.String) string {
 	if !resourceOrg.IsNull() && !resourceOrg.IsUnknown() && resourceOrg.ValueString() != "" {
 		return resourceOrg.ValueString()
 	}
 	return r.config.Organization
 }
 
-func (r *publicRegistryModuleResource) setAuthHeaders(req *http.Request) {
+func (r *publicRegistryProviderResource) setAuthHeaders(req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+r.config.Token)
 	req.Header.Set("Accept", "application/json")
 }
 
 // --- Standalone helper functions ---
 
-// repoNameFromIdentifier extracts the repository name from "org/repo-name".
-func repoNameFromIdentifier(identifier string) string {
-	parts := strings.SplitN(identifier, "/", 2)
-	if len(parts) == 2 {
-		return parts[1]
+// parseProviderRepoName extracts the provider name from a "terraform-provider-<NAME>" repo name.
+func parseProviderRepoName(repoName string) (string, error) {
+	const prefix = "terraform-provider-"
+	if !strings.HasPrefix(repoName, prefix) {
+		return "", fmt.Errorf("expected format terraform-provider-<NAME>, got %q", repoName)
 	}
-	return identifier
+	name := strings.TrimPrefix(repoName, prefix)
+	if name == "" {
+		return "", fmt.Errorf("provider name must not be empty in %q", repoName)
+	}
+	return name, nil
 }
 
-// parseModuleRepoName parses "terraform-<PROVIDER>-<NAME>" into (name, provider).
-func parseModuleRepoName(repoName string) (name string, provider string, err error) {
-	parts := strings.SplitN(repoName, "-", 3)
-	if len(parts) != 3 || parts[0] != "terraform" {
-		return "", "", fmt.Errorf("expected format terraform-<PROVIDER>-<NAME>, got %q", repoName)
-	}
-	return parts[2], parts[1], nil
-}
-
-// readPublicRegistryModule looks up a module on registry.terraform.io.
-// Returns nil, nil if the module is not found.
-func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, token, namespace, name, provider string) (*registryModuleEntry, error) {
+// readPublicRegistryProvider looks up a provider on registry.terraform.io.
+// Returns nil, nil if the provider is not found.
+func readPublicRegistryProvider(ctx context.Context, httpClient *http.Client, token, namespace, name string) (*registryProviderEntry, error) {
 	pageNum := 1
 	for {
 		listURL := fmt.Sprintf(
-			"https://registry.terraform.io/v3/modules?filter[namespace]=%s&page[number]=%d&page[size]=50",
+			"https://registry.terraform.io/v3/providers?filter[namespace]=%s&include=latest-version,publishing-errors&page[number]=%d&page[size]=50",
 			url.QueryEscape(namespace), pageNum,
 		)
 
@@ -493,7 +516,7 @@ func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, toke
 
 		httpResp, err := httpClient.Do(httpReq)
 		if err != nil {
-			return nil, fmt.Errorf("fetching modules from public registry: %w", err)
+			return nil, fmt.Errorf("fetching providers from public registry: %w", err)
 		}
 
 		if httpResp.StatusCode != 200 {
@@ -507,23 +530,15 @@ func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, toke
 			return nil, fmt.Errorf("reading registry response: %w", err)
 		}
 
-		// The registry.terraform.io/v3/modules API returns a plain JSON array
-		var entries []registryModuleEntry
+		// The registry.terraform.io/v3/providers API returns a plain JSON array
+		var entries []registryProviderEntry
 		if err := json.Unmarshal(respBody, &entries); err != nil {
-			// Fall back to a wrapped format {"data": [...]}
-			var wrapped struct {
-				Data []registryModuleEntry `json:"data"`
-			}
-			if err2 := json.Unmarshal(respBody, &wrapped); err2 != nil {
-				return nil, fmt.Errorf("decoding registry response: %w", errors.Join(err, err2))
-			}
-			entries = wrapped.Data
+			return nil, fmt.Errorf("decoding registry response: %w", err)
 		}
 
 		for i := range entries {
-			entry := &entries[i]
-			if entry.Name == name && entry.System == provider {
-				return entry, nil
+			if entries[i].Name == name {
+				return &entries[i], nil
 			}
 		}
 
@@ -534,19 +549,4 @@ func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, toke
 	}
 
 	return nil, nil
-}
-
-// extractNamespaceFromResponse tries to extract the namespace from the create API response.
-func extractNamespaceFromResponse(respBody []byte, fallback string) string {
-	var resp struct {
-		Data struct {
-			Attributes struct {
-				Namespace string `json:"namespace"`
-			} `json:"attributes"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(respBody, &resp); err == nil && resp.Data.Attributes.Namespace != "" {
-		return resp.Data.Attributes.Namespace
-	}
-	return fallback
 }

@@ -126,7 +126,7 @@ func TestReadPublicRegistryModule_Found(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	entry, err := readPublicRegistryModule(context.Background(), client, "test-ns", "vpc", "aws")
+	entry, err := readPublicRegistryModule(context.Background(), client, "", "test-ns", "vpc", "aws")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestReadPublicRegistryModule_NotFound(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	entry, err := readPublicRegistryModule(context.Background(), client, "test-ns", "nonexistent", "aws")
+	entry, err := readPublicRegistryModule(context.Background(), client, "", "test-ns", "nonexistent", "aws")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestReadPublicRegistryModule_WrappedFormat(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	entry, err := readPublicRegistryModule(context.Background(), client, "test-ns", "vpc", "aws")
+	entry, err := readPublicRegistryModule(context.Background(), client, "", "test-ns", "vpc", "aws")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,6 +194,27 @@ func TestReadPublicRegistryModule_WrappedFormat(t *testing.T) {
 	}
 	if entry.Name != "vpc" {
 		t.Errorf("expected name 'vpc', got %q", entry.Name)
+	}
+}
+
+func TestReadPublicRegistryModule_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `not json at all`)
+	}))
+	defer server.Close()
+
+	client := server.Client()
+	originalTransport := client.Transport
+	client.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		req.URL.Scheme = "http"
+		req.URL.Host = server.Listener.Addr().String()
+		return originalTransport.RoundTrip(req)
+	})
+
+	_, err := readPublicRegistryModule(context.Background(), client, "", "test-ns", "vpc", "aws")
+	if err == nil {
+		t.Fatal("expected error for invalid JSON response, got nil")
 	}
 }
 
@@ -211,7 +232,7 @@ func TestReadPublicRegistryModule_ServerError(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	_, err := readPublicRegistryModule(context.Background(), client, "test-ns", "vpc", "aws")
+	_, err := readPublicRegistryModule(context.Background(), client, "", "test-ns", "vpc", "aws")
 	if err == nil {
 		t.Fatal("expected error for 500 response, got nil")
 	}
@@ -251,7 +272,7 @@ func TestReadPublicRegistryModule_Pagination(t *testing.T) {
 		return originalTransport.RoundTrip(req)
 	})
 
-	entry, err := readPublicRegistryModule(context.Background(), client, "test-ns", "target", "aws")
+	entry, err := readPublicRegistryModule(context.Background(), client, "", "test-ns", "target", "aws")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
