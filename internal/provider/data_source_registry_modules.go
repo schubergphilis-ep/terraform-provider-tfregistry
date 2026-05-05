@@ -228,10 +228,7 @@ func listRegistryModules(ctx context.Context, httpClient *http.Client, token str
 	var all []listModulesEntry
 	pageNum := 1
 	for {
-		listURL, err := buildListModulesURL(baseURL, organization, registryName, search, pageNum)
-		if err != nil {
-			return nil, err
-		}
+		listURL := buildListModulesURL(baseURL, organization, registryName, search, pageNum)
 
 		httpReq, err := http.NewRequestWithContext(ctx, "GET", listURL, nil)
 		if err != nil {
@@ -270,7 +267,7 @@ func listRegistryModules(ctx context.Context, httpClient *http.Client, token str
 	return all, nil
 }
 
-func buildListModulesURL(baseURL *url.URL, organization, registryName, search string, pageNum int) (string, error) {
+func buildListModulesURL(baseURL *url.URL, organization, registryName, search string, pageNum int) string {
 	u := *baseURL
 	u.Path = "/api/v2/organizations/" + organization + "/registry-modules"
 	q := u.Query()
@@ -283,7 +280,7 @@ func buildListModulesURL(baseURL *url.URL, organization, registryName, search st
 		q.Set("q", search)
 	}
 	u.RawQuery = q.Encode()
-	return u.String(), nil
+	return u.String()
 }
 
 func buildModulesDataSourceID(organization, registryName, search string) string {

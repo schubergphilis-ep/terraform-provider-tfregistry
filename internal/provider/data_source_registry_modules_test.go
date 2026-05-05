@@ -59,10 +59,7 @@ func TestBuildListModulesURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := buildListModulesURL(base, tt.org, tt.registryName, tt.search, tt.pageNum)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			got := buildListModulesURL(base, tt.org, tt.registryName, tt.search, tt.pageNum)
 			if !strings.Contains(got, tt.wantPath) {
 				t.Errorf("URL %q does not contain expected path %q", got, tt.wantPath)
 			}
@@ -107,8 +104,8 @@ func TestBuildModulesDataSourceID(t *testing.T) {
 func TestListRegistryModules_Single(t *testing.T) {
 	resp := listModulesResponse{
 		Data: []listModulesEntry{
-			fakeListEntry("mod-1", "vpc", "my-org", "private", "aws"),
-			fakeListEntry("mod-2", "network", "my-org", "private", "google"),
+			fakeListEntry("mod-1", "vpc", "aws"),
+			fakeListEntry("mod-2", "network", "google"),
 		},
 	}
 	resp.Meta.Pagination.CurrentPage = 1
@@ -142,7 +139,7 @@ func TestListRegistryModules_Single(t *testing.T) {
 
 func TestListRegistryModules_Pagination(t *testing.T) {
 	page1 := listModulesResponse{
-		Data: []listModulesEntry{fakeListEntry("mod-1", "vpc", "my-org", "private", "aws")},
+		Data: []listModulesEntry{fakeListEntry("mod-1", "vpc", "aws")},
 	}
 	nextPage := 2
 	page1.Meta.Pagination.CurrentPage = 1
@@ -150,7 +147,7 @@ func TestListRegistryModules_Pagination(t *testing.T) {
 	page1.Meta.Pagination.TotalPages = 2
 
 	page2 := listModulesResponse{
-		Data: []listModulesEntry{fakeListEntry("mod-2", "network", "my-org", "private", "google")},
+		Data: []listModulesEntry{fakeListEntry("mod-2", "network", "google")},
 	}
 	page2.Meta.Pagination.CurrentPage = 2
 	page2.Meta.Pagination.TotalPages = 2
@@ -248,11 +245,11 @@ func TestListRegistryModules_InvalidJSON(t *testing.T) {
 	}
 }
 
-func fakeListEntry(id, name, namespace, registryName, provider string) listModulesEntry {
+func fakeListEntry(id, name, provider string) listModulesEntry {
 	e := listModulesEntry{ID: id, Type: "registry-modules"}
 	e.Attributes.Name = name
-	e.Attributes.Namespace = namespace
-	e.Attributes.RegistryName = registryName
+	e.Attributes.Namespace = "my-org"
+	e.Attributes.RegistryName = "private"
 	e.Attributes.Provider = provider
 	e.Attributes.Status = "setup_complete"
 	e.Attributes.CreatedAt = "2024-01-01T00:00:00Z"
