@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/compare/v1.1.0...v1.2.0) (2026-05-05)
+
+
+### 🚀 Features
+
+* implement modules data source for module discovery ([#6](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/issues/6)) ([35d2478](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/commit/35d2478b2fed852773ceaa8a84c12fec31f8f55e))
+
 ## [1.1.0](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/compare/v1.0.0...v1.1.0) (2026-04-16)
 
 
