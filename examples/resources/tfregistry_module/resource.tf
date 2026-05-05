@@ -3,8 +3,8 @@ resource "tfregistry_module" "example" {
   organization = "my-organization"
 
   vcs_repo {
-    identifier                  = "my-github-org/terraform-aws-my-module"
-    github_app_installation_id  = "ghain-xxxxxxxxxxxx"
+    identifier                 = "my-github-org/terraform-aws-my-module"
+    github_app_installation_id = "ghain-xxxxxxxxxxxx"
   }
 }
 
