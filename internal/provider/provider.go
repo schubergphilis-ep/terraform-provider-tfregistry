@@ -169,7 +169,9 @@ func (p *tfregistryProvider) Resources(_ context.Context) []func() resource.Reso
 }
 
 func (p *tfregistryProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		NewRegistryModulesDataSource,
+	}
 }
 
 // valueOrEnv returns the Terraform config value if set, otherwise the env var, otherwise the fallback.
