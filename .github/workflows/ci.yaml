@@ -8,14 +8,14 @@ on:
 
 jobs:
   Commit:
-    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/commit.yaml@v2.0.0
+    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/commit.yaml@e7b9fcd9a9b85b5c42e690ac140b9def7bee2212 # v2.1.2
     permissions:
       contents: read
       pull-requests: write
     secrets: inherit
 
   Provider:
-    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/provider-ci.yaml@v2.0.0
+    uses: schubergphilis-ep/github-terraform-workflows/.github/workflows/provider-ci.yaml@e7b9fcd9a9b85b5c42e690ac140b9def7bee2212 # v2.1.2
     permissions:
       contents: read
     secrets: inherit
