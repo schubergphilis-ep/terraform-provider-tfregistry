@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/compare/v1.2.0...v1.2.1) (2026-06-12)
+
+
+### 🐛 Fixes
+
+* add retry mechanism to be resilient against transient errors ([#8](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/issues/8)) ([f1a42f9](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/commit/f1a42f91d9cfcb653f8794af5e81192033a659bf))
+
 ## [1.2.0](https://github.com/schubergphilis-ep/terraform-provider-tfregistry/compare/v1.1.0...v1.2.0) (2026-05-05)
 
 
