@@ -23,7 +23,7 @@ func fetchRegistryAccessToken(ctx context.Context, httpClient *http.Client, tfeT
 	httpReq.Header.Set("Content-Type", "application/vnd.api+json")
 	httpReq.Header.Set("Accept", "application/json")
 
-	httpResp, err := httpClient.Do(httpReq)
+	httpResp, err := doWithRetry(httpClient, httpReq)
 	if err != nil {
 		return "", fmt.Errorf("fetching registry access token: %w", err)
 	}

@@ -381,7 +381,7 @@ func (r *publicRegistryModuleResource) Delete(ctx context.Context, req resource.
 	}
 	r.setAuthHeaders(httpReq)
 
-	httpResp, err := r.config.HTTPClient.Do(httpReq)
+	httpResp, err := doWithRetry(r.config.HTTPClient, httpReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to delete public registry module", err.Error())
 		return
@@ -491,7 +491,7 @@ func readPublicRegistryModule(ctx context.Context, httpClient *http.Client, toke
 		httpReq.Header.Set("Accept", "application/json")
 		httpReq.Header.Set("Authorization", "Bearer "+token)
 
-		httpResp, err := httpClient.Do(httpReq)
+		httpResp, err := doWithRetry(httpClient, httpReq)
 		if err != nil {
 			return nil, fmt.Errorf("fetching modules from public registry: %w", err)
 		}

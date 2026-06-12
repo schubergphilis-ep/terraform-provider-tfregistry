@@ -237,7 +237,7 @@ func listRegistryModules(ctx context.Context, httpClient *http.Client, token str
 		httpReq.Header.Set("Authorization", "Bearer "+token)
 		httpReq.Header.Set("Accept", "application/json")
 
-		httpResp, err := httpClient.Do(httpReq)
+		httpResp, err := doWithRetry(httpClient, httpReq)
 		if err != nil {
 			return nil, fmt.Errorf("listing modules: %w", err)
 		}

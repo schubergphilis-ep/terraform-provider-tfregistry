@@ -408,7 +408,7 @@ func (r *publicRegistryProviderResource) Delete(ctx context.Context, req resourc
 	}
 	r.setAuthHeaders(httpReq)
 
-	httpResp, err := r.config.HTTPClient.Do(httpReq)
+	httpResp, err := doWithRetry(r.config.HTTPClient, httpReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to delete public registry provider", err.Error())
 		return
@@ -514,7 +514,7 @@ func readPublicRegistryProvider(ctx context.Context, httpClient *http.Client, to
 		httpReq.Header.Set("Accept", "application/json")
 		httpReq.Header.Set("Authorization", "Bearer "+token)
 
-		httpResp, err := httpClient.Do(httpReq)
+		httpResp, err := doWithRetry(httpClient, httpReq)
 		if err != nil {
 			return nil, fmt.Errorf("fetching providers from public registry: %w", err)
 		}
