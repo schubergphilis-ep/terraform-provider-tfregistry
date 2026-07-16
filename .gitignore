@@ -1,41 +1,20 @@
 # WARNING: This file is managed automatically and may be overwritten at any time.
 
-# Local .terraform directories
-**/.terraform/*
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# .tfstate files
-*.tfstate
-*.tfstate.*
+# Test binary, built with `go test -c`
+*.test
 
-# .tfvars files
-# These should not be part of version control as they are data points which are potentially sensitive and subject to change depending on the environment.
-*.tfvars
-*.tfvars.json
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
 
-# Crash log files
-crash.log
-crash.*.log
+# Dependency directories
+vendor/
 
-# Override files
-# These should not be part of version control as they are usually used to override resources locally
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-
-# Ignore transient lock info files created by terraform apply
-.terraform.tfstate.lock.info
-
-# Terraform locks
-# This is a module, not a stand-alone deployment
-.terraform.lock.hcl
-
-# Ignore CLI configuration files
-.terraformrc
-terraform.rc
-
-# CheckOv pre-commit external modules path
-**/.external_modules/*
-
-# Local Lambda function package directories
-**/builds/*
+# Added by goreleaser init:
+dist/
