@@ -39,7 +39,7 @@ Authentication is resolved from (in order):
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.25 (to build the provider)
+- [Go](https://golang.org/doc/install) >= 1.26 (to build the provider)
 
 ## Building
 
